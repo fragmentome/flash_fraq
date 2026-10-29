@@ -1,0 +1,42 @@
+# Workstation overlay for the HCC1395/SEQC2 chain (docs/todo/in-progress/
+# hcc1395-local-smoke-benchmark.md). Layered ON TOP of
+# workflow/config/hcc1395.yaml by passing it as a CLI --configfile: Snakemake
+# applies CLI configfiles after the Snakefile's `configfile:` directives and
+# lets them win, so nothing in the committed cluster config or in
+# workflow/rules/hcc1395.smk has to change to run the same rules here.
+#
+# Only the deployment-specific values are repeated -- sra_study_accession is
+# inherited from the cluster config, since the study is the same either way.
+hcc1395:
+  # NVMe (/mnt/data, 611G free), not /mnt/8tb_hdd: one run writes ~150G of
+  # uncompressed FASTQ plus an unsorted+sorted BAM pair, and the point of the
+  # local run is to measure alignment throughput rather than disk seek time.
+  # This disk is also what local_features stages onto (`ssd_mb: 400000` in
+  # workflow/profiles/local/config.yaml) -- that pool is an accounting figure
+  # for concurrent staging jobs, not a reservation, so do not run this smoke
+  # test and a local_features cohort run at the same time.
+  output_root: "/mnt/data/flash_fraq_hcc1395"
+  # rsync'd from the cluster's REF_GENOMES/hg19 by
+  # scripts/drivers/fetch_hg19_reference_local_driver.sh -- the same FASTA and
+  # the same prebuilt BWA index the cluster aligns against, so a locally
+  # produced BAM is comparable to a cluster one rather than merely similar.
+  reference_fasta: "/mnt/data/reference_genome/hg19/hg19.fa"
+  # 36 cores on this box; 32 leaves room for the samtools view/sort side of
+  # the pipe and for the machine to stay usable during a multi-hour run.
+  threads: 32
+  # 32 x 1500M = 48G peak sort footprint against 125G of RAM. The cluster
+  # config's 2G is sized for its own 24 threads inside a 64G job.
+  #
+  # Lowered from 3G on 2026-09-04. 32 x 3G asked for 96G and measured 102G
+  # resident, which fit only while a single attended run had the box to
+  # itself. The unattended cohort queue broke that assumption three ways at
+  # once: PREFETCH_AHEAD=1 downloads the next run's FASTQ pair alongside the
+  # sort, the user's desktop session stays logged in, and nothing is watching
+  # to restart a casualty. At 3G the box was already 111G used / 15G swapped
+  # with 13G available, and the OOM killer took a process on 2026-09-04 --
+  # if it had picked samtools instead, that run would be marked .failed and
+  # skipped, and all three retry passes would reproduce the same peak and
+  # fail it again. Sort speed is nearly flat above ~1G per thread; the buffer
+  # trades against temp-chunk count, not wall clock, and /mnt/data has 553G
+  # free to hold the extra chunks.
+  sort_memory_per_thread: "1500M"

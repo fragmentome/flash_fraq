@@ -1,0 +1,20 @@
+name: flash_fraq
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.14
+  - bwa
+  - samtools>=1.15
+  - bcftools
+  - bedtools
+  - wget
+  # curl fetches ENA's submitted fastq.gz; pigz compresses the fallback
+  # path's fasterq-dump output across the fetch job's threads
+  # (src/flash_fraq/hcc1395_retrieval.py).
+  - curl
+  - pigz
+  - sra-tools
+  - pip
+  - pip:
+      - -e .

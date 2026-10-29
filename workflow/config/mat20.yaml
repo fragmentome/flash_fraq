@@ -1,0 +1,7 @@
+mat20:
+  snyder_download_dir: "/home/isilon/HumGenTempData/WGS/Public_data/Snyder_Shendure_WPS/FASTQ"
+  reference_fasta: "/home/isilon/HumGenTempData/REF_GENOMES/hg19/hg19.fa"
+  output_root: "/home/isilon/HumGenTempData/WGS/Public_data/Snyder_Shendure_WPS/BAM"
+  threads: 8
+  staging_dir: "/media/humangenetik/flash_fraq_mat20_staging"
+  staging_node: "sy096"

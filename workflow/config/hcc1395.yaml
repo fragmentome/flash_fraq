@@ -1,0 +1,24 @@
+hcc1395:
+  sra_study_accession: "SRP162370"
+  reference_fasta: "/home/isilon/HumGenTempData/REF_GENOMES/hg19/hg19.fa"
+  output_root: "/home/isilon/HumGenTempData/WGS/Public_data/HCC1395_SEQC2"
+  # 24 = one sx-node's physical cores (the cpu partition's small nodes are
+  # 48 CPUs / 24 cores + HT). At the previous 8, the cohort's measured
+  # alignment cost -- 22.4 Tbp x ~4.4k CPU-s/Gbp = ~27.6k CPU-hours -- came to
+  # ~215 h of wall clock at bam_align=16; at 24 it is ~72 h, for the same 16
+  # concurrent jobs. See docs/todo/in-progress/hcc1395-local-smoke-benchmark.md.
+  threads: 24
+  # Fetch jobs only use these on the SRA-toolkit fallback path (pigz +
+  # fasterq-dump); ENA-served runs arrive already compressed.
+  fetch_threads: 8
+  # fasterq-dump's memory use scales with --threads. mem_mb was hardcoded at
+  # 16000 from when fetch ran single-threaded; bumping fetch_threads to 8
+  # without scaling this OOM-killed SRR7890893 (80G .sra) on the cluster
+  # 2026-09-01. 4000 x 8 = 32000 mirrors the old 16000 that worked at the
+  # previous default of 4 threads.
+  fetch_mem_mb_per_thread: 4000
+  # samtools sort takes -m PER THREAD, so the sort's peak is threads x this.
+  # 24 x 2G = 48G, which with bwa's ~10G index is what the align rule's
+  # mem_mb now requests. The old implicit 16G default would have been
+  # 24 x 16G = 384G per job.
+  sort_memory_per_thread: "2G"

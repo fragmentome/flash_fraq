@@ -1,0 +1,64 @@
+# HCC1395/HCC1395BL lane -> library CRAM merge, and the native-coverage
+# measurement that follows it (MAT-23 Block C).
+#
+# Workstation-local, like local_features/cohort_qc/admixture_design: the inputs
+# are the per-run CRAMs that sync_crams_to_hdd.sh mirrored onto the 8 TB HDD,
+# and the outputs go back into the same tree. It is kept in its own file rather
+# than folded into hcc1395.yaml because that file is the *cluster* side of this
+# chain (isilon output_root, isilon reference) and the two must not share keys.
+#
+# Ask for it by name:
+#   snakemake --workflow-profile workflow/profiles/local hcc1395_merge_complete
+#   snakemake --workflow-profile workflow/profiles/local hcc1395_merged_coverage_report
+hcc1395_merge:
+  # Where the per-run CRAMs are, and where the merged libraries are written:
+  # <cram_root>/<dataset>/CRAM/<sample_id>/<sample_id>.sorted.cram. Same layout
+  # as the lane archive, so NativeCoverageHarvester.cram_path and
+  # local_features' discover_local_crams resolve both without a special case.
+  cram_root: "/mnt/8tb_hdd/flash_fraq_crams"
+  dataset: "HCC1395_SEQC2"
+
+  # The site/arm/replicate decomposition of ENA's library_name. The site is
+  # encoded ONLY here -- center_name is "FDA" on all 118 rows and is the
+  # *submitting* centre, not the sequencing site (parent ticket, 2026-09-04).
+  pairs_manifest: "manifests/hcc1395/hcc1395_library_pairs.csv"
+
+  # The hg19 FASTA these CRAMs were aligned against, in its workstation
+  # location. CRAM is reference-relative, so both `samtools merge` and mosdepth
+  # need it; a mismatched FASTA decodes to garbage rather than to an error.
+  reference_fasta: "/mnt/data/reference_genome/hg19/hg19.fa"
+
+  # Which prep families are merged. WGS only: CHR and LBP are different prep
+  # chemistries (LBP is an input-mass titration) and none of their runs are
+  # banked, and SPP has no T/N arm at all -- it is a pre-pooled genotype
+  # mixture, so it is neither a tumor library nor a background one.
+  preps: ["WGS"]
+
+  # Merge only libraries that form a complete tumor/normal pair (2026-09-16).
+  # Nine of the twelve sites have both arms banked; the six libraries that do
+  # not -- HCC1395BL_WGS_{IL_1,NS_3,NS_8} and HCC1395_WGS_{FD_2,NS_4,NS_5} --
+  # have no consumer. MAT-13's matched_pair regime needs a T and an N from the
+  # same site and replicate, and pairing a spare arm with another site's would
+  # rebuild the batch confound the 2026-08-31 background demotion removed. So
+  # they would be ~250 GB of the ~1.07 TB full merge, written for nothing.
+  #
+  # Set false to build all 24. The lane CRAMs are never deleted, so this is
+  # reversible at any time for the cost of the merge itself.
+  pairs_only: true
+
+  # Where rule hcc1395_merged_coverage writes each merged library's mosdepth
+  # output. Deliberately the same derived tree, and the same
+  # <dataset>/<sample_id>/coverage/<sample_id>.mosdepth.summary.txt path, that
+  # rule localfeat_coverage uses, so these summaries are harvestable by
+  # NativeCoverageHarvester unchanged.
+  derived_root: "/mnt/8tb_hdd/flash_fraq_derived"
+
+  # samtools merge threads. The merge is IO-bound on the HDD, so this is well
+  # past the point of scaling -- it is here to keep CRAM re-encode off the
+  # critical path, not to go faster than the spindle.
+  merge_threads: 8
+
+  # 4, to match rule localfeat_coverage exactly. The whole point of this rule is
+  # that its numbers are comparable with the 547 rows already in
+  # native_coverage.csv, and mosdepth's thread count is part of that invocation.
+  mosdepth_threads: 4

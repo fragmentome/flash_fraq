@@ -1,0 +1,151 @@
+# Admixture design (phase2 §7 step 1): native-coverage harvest, feasibility
+# table, mixture plan. Workstation-local like cohort_qc -- it reads the
+# local_features derived tree and writes four CSVs, and touches no reads.
+#
+# This is the design, not the build. MAT-13 consumes admixture_plan.csv; nothing
+# here needs HCC1395 to exist.
+admixture_design:
+  derived_root: "/mnt/8tb_hdd/flash_fraq_derived"
+  cram_root: "/mnt/8tb_hdd/flash_fraq_crams"
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/cohort"
+
+  # Cohort metadata that a mosdepth summary cannot carry. `platform` matches
+  # cohort_qc.dataset_platforms (same fact, and the §6 decoy classifier's
+  # target); `source_group` and `tumor_status` are input_manifest's vocabulary,
+  # since the harvester writes an input_manifest CSV.
+  datasets:
+    - name: "Snyder_Shendure_WPS"
+      platform: "HiSeq2000"
+      source_group: "snyder"
+      tumor_status: "healthy"
+    - name: "Cristiano_Velculescu_DELFI"
+      platform: "HiSeq2500"
+      source_group: "cristiano_delfi"
+      # Dataset-level fallback only. The DELFI release mixes cancer patients and
+      # controls (242 healthy / 261 cancer), so the per-sample value comes from
+      # phenotype_path (scripts/extract_delfi_phenotype.py, read off the CRAM
+      # headers' FASTQ directories). The harvester raises on any unmatched sample.
+      tumor_status: "tumor"
+      phenotype_path: "manifests/cristiano_delfi_phenotype.csv"
+
+  reference_build: "hg19"
+
+  # Which source groups may serve as the real_background regime's mixing
+  # background. Reopened 2026-09-01: Snyder is demoted to held-out cross-center
+  # evaluation (MAT-13's superseding decision), so this narrows to Cristiano
+  # only -- it must be enforced here, not just stated in the docs, since the
+  # C_target retention computation assumes Snyder is out of the pool. See
+  # docs/admixture-design.md's "Reopened decision" section.
+  background_source_groups: ["cristiano_delfi"]
+
+  # Reopened 2026-09-25 (docs/todo/in-progress/delfi-background-phenotype-filter.md):
+  # only per-sample-healthy donors may serve as backgrounds. A cancer-patient
+  # background carries its own ctDNA (true f = f + (1-f)*TF_bg), which the
+  # HCC1395-SNV label cannot see but the CNV/fragment features can. With ~240
+  # healthy donors and 44 mixtures per rung, the round-robin puts each donor at
+  # about 2 rungs, always inside its one split group.
+  background_tumor_status: "healthy"
+
+  # The tumor side.
+  #
+  # MAT-23 Block C (2026-09-16) retargeted sample_id/bam_path from the
+  # never-built whole-cell-line "HCC1395" CRAM to a concrete *library*:
+  # SEQC2 sequenced HCC1395 as several independent libraries at several sites,
+  # and the DELFI short:long ratio is a property of the library, not of the
+  # cell line, so pooling sites would blend prep effects into the tumor signal.
+  # rule merge_hcc1395_library builds one CRAM per <subject>_<prep>_<site>_<rep>
+  # (flash_fraq.hcc1395_merge); this names one of them.
+  #
+  # CONFIRMED 2026-09-16: NV_3 it is. It is the deepest of the 9 complete
+  # matched T/N pairs on disk (~133x tumor / ~101x normal by manifest base
+  # counts; the limiting arm is the normal at 101x), against IL_3's 84.6x/81.1x
+  # and IL_2's 84.5x/75.3x. Depth on the *limiting* arm is the only criterion
+  # that separates them -- all four arms in contention are the same instrument
+  # (Illumina HiSeq 4000, confirmed live from ENA), both pairs are
+  # site-and-replicate matched, and all four runs of each NV_3 arm are banked,
+  # so nothing is being traded away for the extra 20x.
+  #
+  # Depth is worth having because the tumor side is downsampled to <=1x: at
+  # 101x the limiting arm carries ~101 independent draws per rung, so distinct
+  # mixtures at the same f share fewer reads and the replicates are closer to
+  # independent. IL_3 stays the fallback if NV_3 ever fails verification.
+  #
+  # The earlier IL_2 pick was an artifact of retrieval order -- IL_2 was simply
+  # the first pair to finish fetching, not a scientific choice. The NS pair is
+  # unusable regardless (replicate-mismatched, see
+  # docs/todo/completed/hcc1395-seqc2-retrieval-and-alignment.md).
+  #
+  # native_coverage: rule hcc1395_merged_coverage_report,
+  # hcc1395_merged_native_coverage.csv, 2026-09-17. Was a 35.0 placeholder (the
+  # low end of phase2 §7's 35-47x native range); the real number came in above
+  # it, which only relaxes the tumor-side downsample-fraction constraint the
+  # placeholder was chosen to under-declare.
+  tumor:
+    sample_id: "HCC1395_WGS_NV_3"
+    subject_id: "HCC1395"
+    # "HiSeq4000", not "HiSeq": this string is the §6 decoy classifier's target
+    # and must share cohort_qc.dataset_platforms' vocabulary ("HiSeq2000" for
+    # Snyder, "HiSeq2500" for Cristiano). A bare "HiSeq" would collide with
+    # neither but also sort with neither. NV is Illumina HiSeq 4000 per ENA's
+    # instrument_model on all 8 NV_3 runs (2026-09-16).
+    platform: "HiSeq4000"
+    native_coverage: 126.59
+    bam_path: "/mnt/8tb_hdd/flash_fraq_crams/HCC1395_SEQC2/CRAM/HCC1395_WGS_NV_3/HCC1395_WGS_NV_3.sorted.cram"
+
+  # The matched_pair regime's background: HCC1395's own matched normal. Must be
+  # the *same site and replicate* as `tumor` above, which is the whole point of
+  # the regime -- HCC1395BL_WGS_NV_3 was prepped and sequenced alongside
+  # HCC1395_WGS_NV_3, so a mixture of the two differs in tumour content and in
+  # nothing else. Change both entries together or the regime is meaningless.
+  #
+  # native_coverage: rule hcc1395_merged_coverage_report,
+  # hcc1395_merged_native_coverage.csv, 2026-09-17. Was a 34.0 placeholder on
+  # the same terms as tumor above.
+  matched_pair_background:
+    sample_id: "HCC1395BL_WGS_NV_3"
+    subject_id: "HCC1395BL"
+    source_group: "hcc1395bl"
+    # Same instrument as the tumor arm, necessarily -- that is what "matched
+    # pair" means here. See the tumor block above.
+    platform: "HiSeq4000"
+    native_coverage: 95.91
+    bam_path: "/mnt/8tb_hdd/flash_fraq_crams/HCC1395_SEQC2/CRAM/HCC1395BL_WGS_NV_3/HCC1395BL_WGS_NV_3.sorted.cram"
+
+  # phase0 §1.1: ichorCNA operates on 0.1x-1x ULP-WGS, so the *coverage*
+  # candidates span that range. Nothing above 1x -- a deeper mixture would be
+  # outside the regime the whole feature set is designed for. Reopened
+  # 2026-09-01: with Snyder demoted, the deepest candidate (1.0x) is what
+  # `choose_target_coverage` now picks -- neither regime's background binds
+  # below the ceiling anymore (docs/admixture-design.md).
+  candidate_target_coverages: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+  # The f ladder. Includes 0.0 because §6 check 1 is specified at f=0, and is
+  # dense below 0.1 because ichorCNA's reported sensitivity floor is ~3%
+  # (phase0 §1.1) -- that is the region this model is meant to beat, so it is
+  # where the label needs resolution.
+  fraction_ladder: [0.0, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5]
+
+  # Mixtures built per rung, real_background regime. 44 x 11 rungs = 484
+  # mixtures, each a downsample + merge + dedup + mpileup, which is the scale
+  # the workstation can absorb.
+  mixtures_per_fraction: 44
+
+  # matched_pair has one background subject, so there is nothing to allocate
+  # across -- this is a plain per-rung replicate count under distinct seeds.
+  # 1 for now: more replicates is a training-data-volume question for MAT-13
+  # to raise once real coverage lands, not part of this reopened decision.
+  matched_pair_replicates_per_fraction: 1
+
+  # C_target is accepted only if every source keeps at least this many samples
+  # AND this share of its samples at the lowest rung. The share floor is what
+  # stops a candidate from passing on Cristiano's 503 samples while quietly
+  # discarding most of Snyder's 44.
+  min_background_samples_per_source: 20
+  min_background_retention_per_source: 0.9
+
+  split_fractions:
+    train: 0.7
+    validation: 0.15
+    test: 0.15
+
+  seed: 42

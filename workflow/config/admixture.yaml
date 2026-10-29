@@ -1,0 +1,27 @@
+# In silico tumor/healthy admixture mixture build (phase2 §7 step 2, MAT-13's
+# wiring half). Reads admixture_plan.csv (from rule admixture_design) and, per
+# row, downsamples + merges + dedups the two source CRAMs and computes the
+# empirical SNV-VAF tumor fraction. Workstation-local, like admixture_design
+# itself: output_root moved off isilon once mosdepth/coverage work did (see
+# docs/admixture-design.md, "everything downstream of a BAM is
+# workstation-local"), and this stage is squarely downstream of a BAM.
+admixture:
+  # admixture_plan.csv itself is not configured here: it is checkpoint
+  # admixture_design's output (admixture_design.yaml's output_root), read via
+  # checkpoints.admixture_design.get(...) in common.smk so the two stages
+  # can never disagree about where the plan lives.
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures"
+  reference_fasta: "/mnt/data/reference_genome/hg19/hg19.fa"
+
+  # MAT-13's two SNV-VAF estimators, both computed per mixture -- their
+  # agreement is a free correctness check, not a pass/fail gate (rollout
+  # ticket §4). `vaf_tumor_pure` is INFO/bwaTVAF in both files.
+  snv_vaf_paths:
+    sites: "/mnt/data/reference_genome/hcc1395_seqc2/hcc1395_sSNV_hg19.sites.vcf.gz"
+    clonal: "/mnt/data/reference_genome/hcc1395_seqc2/hcc1395_sSNV_hg19.clonal.vcf.gz"
+
+  # samtools merge/sort/markdup + bcftools mpileup, comparably I/O-heavy to
+  # rule merge_hcc1395_library -- same threading and memory choice.
+  threads: 8
+  mem_mb: 8192
+  runtime: 480

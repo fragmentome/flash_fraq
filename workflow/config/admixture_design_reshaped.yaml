@@ -1,0 +1,63 @@
+# Overlay for the reshaped-tumor rebuild (docs/todo/todo/reshaped-mixture-downstream-rerun.md).
+#
+# Layered on top of workflow/config/admixture_design.yaml via an *additional*
+# `--configfile` on the snakemake command line (Snakemake merges configfiles
+# with snakemake.utils.update_config, which recurses into nested dicts --
+# confirmed against snakemake 9.11.4), so only the keys below need restating;
+# everything else (datasets, background_source_groups, fraction_ladder,
+# candidate_target_coverages, split_fractions, retention floors, seed, ...)
+# is inherited unchanged from the base config, which stays exactly as it was
+# for the live/original build. Never edit admixture_design.yaml itself for
+# this -- that config is what the *already-built* 495-mixture plan came from,
+# and re-running it must keep reproducing that same plan.
+#
+# Usage: pass both this file and admixture_reshaped.yaml as
+# `--configfile ... admixture_design_reshaped.yaml admixture_reshaped.yaml`
+# (in that order -- admixture depends on admixture_design's checkpoint output
+# paths, not the other way around, but Snakemake config layering is
+# order-independent here since the two touch disjoint top-level keys:
+# `admixture_design` vs `admixture`).
+#
+# tumor.bam_path and tumor.native_coverage below are PLACEHOLDERS.
+# scripts/drivers/reshaped_tumor_and_mixture_chain.sh overwrites this file's
+# `tumor:` block in place (via a small in-line Python rewrite, same file,
+# same schema) once it has actually built the reshaped tumor BAM and
+# measured its real coverage -- see that script's "patch the reshaped tumor
+# source into the overlay config" step. Do not hand-edit those two values;
+# they are meaningless until the chain has run past that step.
+admixture_design:
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/cohort_reshaped"
+
+  # The reshaped, MAPQ>=30, pooled-NV_1+NV_3 tumor source
+  # (reshaping-pilot-post-hoc-filter.md's "go, full rebuild" verdict). Same
+  # subject/platform as the original NV_3-only tumor entry -- pooling NV_1 and
+  # NV_3 does not change the subject or the sequencing site/prep, only which
+  # reads represent it and how many of them survive the reshaping filter.
+  tumor:
+    sample_id: "HCC1395_WGS_NV1_NV3_pooled_reshaped"
+    subject_id: "HCC1395"
+    platform: "HiSeq4000"
+    native_coverage: 0.72
+    bam_path: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/reshaped_tumor/HCC1395_NV1_NV3_pooled.reshaped.bam"
+
+  # matched_pair is not rebuilt: fragment-size-reshaping.md's own
+  # "Which regime this actually gates" section says reshaping doesn't apply
+  # to a sheared-cell-line-vs-sheared-cell-line regime (there is no cfDNA
+  # reference distribution on either arm to mismatch against), and the
+  # existing 11 matched_pair mixtures under admixture_mixtures/ are reused
+  # unchanged by the chain script rather than rebuilt here. 0 replicates
+  # means this design run emits `real_background` rows only (see
+  # tests/test_admixture_design.py::test_zero_matched_pair_replicates_produces_real_background_only);
+  # matched_pair_background must still be a config with real, feasible
+  # values (build_matched_pair_plan checks feasibility once even at 0
+  # replicates), so it is left pointing at the original, unreshaped
+  # HCC1395BL_WGS_NV_3 CRAM -- inherited unchanged from admixture_design.yaml
+  # would be fine too, restated here only for clarity of intent.
+  matched_pair_replicates_per_fraction: 0
+  matched_pair_background:
+    sample_id: "HCC1395BL_WGS_NV_3"
+    subject_id: "HCC1395BL"
+    source_group: "hcc1395bl"
+    platform: "HiSeq4000"
+    native_coverage: 95.91
+    bam_path: "/mnt/8tb_hdd/flash_fraq_crams/HCC1395_SEQC2/CRAM/HCC1395BL_WGS_NV_3/HCC1395BL_WGS_NV_3.sorted.cram"

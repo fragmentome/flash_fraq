@@ -1,0 +1,38 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.worktrees/
+.snakemake/
+reports/
+logs/
+.idea.workstation-backup/
+*.whl
+
+# local tooling / editor state
+.claude/
+.idea/
+snakemake_workdirs/*/
+!snakemake_workdirs/README.md
+
+# data and model artifacts: never commit (see data/README.md)
+data/*
+!data/README.md
+*.bam
+*.bai
+*.cram
+*.crai
+*.fastq
+*.fastq.gz
+*.fq.gz
+*.fa
+*.fa.gz
+*.fai
+*.joblib
+*.pkl
+.venv-*/
+
+# internal working notes / access-controlled metadata (not published)
+CLAUDE.MD
+manifests/cristiano_delfi_phenotype.csv

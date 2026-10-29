@@ -1,0 +1,28 @@
+"""Standalone Snakemake entry point for the reshaped-mixture downstream rerun
+(docs/todo/todo/reshaped-mixture-downstream-rerun.md,
+scripts/drivers/reshaped_downstream_chain.sh).
+
+Deliberately a SEPARATE Snakefile from workflow/Snakefile, not an extra
+configfile/include tacked onto it: the live admixture mixture build
+(snakemake_workdirs/admixture) was started from the main Snakefile, and this
+file must never be touched by, or share a DAG/workdir with, that run. Driven
+from its own workdir (snakemake_workdirs/reshaped_downstream), same pattern
+workflow/Snakefile's own docstring describes for concurrent workflows.
+"""
+
+from pathlib import Path
+
+REPO_ROOT = Path(workflow.basedir).parent
+CONFIG_DIR = REPO_ROOT / "workflow" / "config"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+
+configfile: str(CONFIG_DIR / "admixture_downstream_reshaped.yaml")
+
+
+include: "rules/admixture_downstream.smk"
+
+
+rule all:
+    input:
+        rules.downstream_tf_eval_complete.output,

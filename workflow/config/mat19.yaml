@@ -1,0 +1,5 @@
+mat19:
+  cristiano_fastq_root: "/home/isilon/HumGenTempData/WGS/Public_data/Cristiano_Velculescu_DELFI/FASTQ"
+  reference_fasta: "/home/isilon/HumGenTempData/REF_GENOMES/hg19/hg19.fa"
+  output_root: "/home/isilon/HumGenTempData/WGS/Public_data/Cristiano_Velculescu_DELFI/BAM"
+  threads: 8

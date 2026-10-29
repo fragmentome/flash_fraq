@@ -1,0 +1,23 @@
+executor: local
+jobs: 4
+# §8b.4: a single pysam worker moves ~56 MB/s, so a handful of concurrent
+# samples is what saturates IO -- past that they contend rather than scale.
+# Raise with --cores/--jobs once staging has moved the hot path to the SSD.
+cores: 16
+# ssd_mb caps how much of /mnt/data (611 GB free) the staged CRAMs and the
+# transient readCounter BAMs may occupy at once. It is an accounting figure,
+# not a reservation: Snakemake simply will not start a staging job whose
+# declared footprint would exceed what remains. 400 GB leaves headroom for
+# whatever else uses the SSD.
+#
+# Keep every resource in this single mapping: YAML has no key merging, so a
+# second `resources:` block silently replaces this one rather than adding to
+# it, and the lost limit only shows up as an over-full disk mid-run.
+resources:
+  ssd_mb: 400000
+  ena_download: 4
+  sra_fetch: 4
+  bam_align: 16
+# One bad sample (a truncated CRAM from an interrupted rsync --partial)
+# otherwise aborts the whole cohort, so a run only reveals one at a time.
+keep-going: true

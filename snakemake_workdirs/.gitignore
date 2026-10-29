@@ -1,0 +1,4 @@
+# Snakemake state is per-workflow scratch, not source (see README.md).
+*
+!.gitignore
+!README.md

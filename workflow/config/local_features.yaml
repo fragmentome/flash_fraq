@@ -1,0 +1,127 @@
+# MAT-14/15/16: local (workstation) feature extraction from hg19 CRAMs.
+# docs/phase2-preprocessing-plan.md §8b.3 stage order, CRAM edition.
+#
+# Everything here is workstation-local -- this workflow never runs on the
+# cluster (§8: the HPC does FASTQ->BAM alignment, the workstation does
+# everything downstream of an aligned file).
+local_features:
+  # Where sync_crams_to_hdd.sh deposits the mirrored archive.
+  cram_root: "/mnt/8tb_hdd/flash_fraq_crams"
+  # A dataset is either a bare directory name or a {name, sample_pattern}
+  # mapping; the pattern must match a sample id in full. Both entries below are
+  # bare names -- the mapping form is still supported by dataset_name() and is
+  # what HCC1395_SEQC2 would need if it were ever registered here.
+  #
+  # HCC1395_SEQC2 is deliberately NOT in this list (decided 2026-09-16).
+  # Registering it was the obvious move and it is the wrong one: the merged
+  # HCC1395/HCC1395BL libraries are not cohort samples, they are the two
+  # *ingredients* MAT-13 mixes. The features that matter are the mixtures',
+  # measured after admixture at the ladder's target coverage; running the chain
+  # on the pure libraries produces tables nothing consumes.
+  #
+  # It is also wrong on its own terms. These libraries are 53-133x cell-line
+  # DNA, while every sample this workflow was built for is 0.75-1.58x plasma
+  # cfDNA. ichorCNA estimates tumor fraction in low-coverage cfDNA -- on pure
+  # HCC1395 the answer is "1.0" by construction, and on its matched normal
+  # "0.0"; neither is information. The DELFI short:long ratio is likewise a
+  # cfDNA fragmentation property and does not mean the same thing on sheared
+  # cell-line input.
+  #
+  # And it does not fit the machine: rule localfeat_cram_to_bam decodes a temp
+  # BAM at ~3x CRAM size for readCounter's sole benefit, which is ~280 GB for
+  # the largest library against 184 GB free on the SSD staging mount. Fixing
+  # that would mean re-plumbing staging for samples that should not be staged.
+  #
+  # What the merged libraries actually need is native coverage, for MAT-13's
+  # §7.1 downsample fractions -- and rule hcc1395_merged_coverage measures that
+  # directly off the HDD with mosdepth, writing the same
+  # <dataset>/<sample_id>/coverage/<sample_id>.mosdepth.summary.txt path this
+  # workflow uses, so NativeCoverageHarvester reads it with no special case.
+  datasets:
+    - "Snyder_Shendure_WPS"
+    - "Cristiano_Velculescu_DELFI"
+
+  # Derived outputs are small and must survive a staging wipe, so they live on
+  # the HDD, not the SSD scratch.
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived"
+
+  # SSD staging (nvme0n1p4, 611 GB free). Staged CRAMs and the transient BAM
+  # are temp() outputs -- Snakemake deletes each sample's copies as soon as
+  # that sample's last consumer finishes.
+  staging_root: "/mnt/data/flash_fraq_stage"
+
+  reference_fasta: "/mnt/8tb_hdd/references/genome/hg19/hg19.fa"
+
+  # Primary assembly only: hg19.fa.fai also carries *_hap*/*_random/chrUn
+  # contigs, which have no DELFI windows or ichorCNA bins and would otherwise
+  # leak into the window BEDs.
+  primary_contigs:
+    ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9",
+     "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17",
+     "chr18", "chr19", "chr20", "chr21", "chr22", "chrX"]
+
+  delfi_window_bp: 5000000
+  ichor_bin_bp: 1000000
+
+  # Coverage-bias mask (docs/results-corruption-audit.md, reshaping-pilot
+  # coverage_bias_report.json): rule localfeat_gc_correct drops any 5 Mb DELFI
+  # window within this many bp of an hg19 centromere or chromosome end before
+  # its LOESS fit (flash_fraq.genome_mask). 0 disables masking. Optional --
+  # falls back to genome_mask.DEFAULT_MASK_MARGIN_BP if absent.
+  mask_margin_bp: 5000000
+
+  # ichorCNA (§4). runIchorCNA.R lives outside the conda env; the R package it
+  # sources is in the `problem2` env, which is also where Rscript comes from.
+  #
+  # §8b.2 flagged that the HMMcopy binaries and the ichorCNA R package sit in
+  # *different* envs and suggested consolidating them. They are still split,
+  # so rather than force one env to satisfy both, each binary is addressed by
+  # absolute path -- the rule's own conda env only needs Python.
+  readcounter_bin: "/home/matvii/miniconda3/envs/TSO500ichorCNA/bin/readCounter"
+  rscript_bin: "/home/matvii/miniconda3/envs/problem2/bin/Rscript"
+  ichorcna_script: "/mnt/8tb_hdd/data/ichorCNA/scripts/runIchorCNA.R"
+  # libdir pins the script to the R sources it shipped with. Without it the
+  # script does `library(ichorCNA)` and loads the conda build instead: the
+  # checkout here is 0.3.2 (2019), the conda package is 0.5.1, and that pair
+  # fails inside runEM with "incorrect number of subscripts" (observed on
+  # IA01). extdata comes from the same checkout for the same reason.
+  ichorcna_libdir: "/mnt/8tb_hdd/data/ichorCNA"
+  ichorcna_extdata: "/mnt/8tb_hdd/data/ichorCNA/inst/extdata"
+  # ichorCNA ships hg19 1 Mb GC and mappability WIGs, so gcCounter/mapCounter
+  # never need to run: gcCounter would recompute an identical file per sample,
+  # and mapCounter cannot run at all -- it needs a mappability bigWig that is
+  # not on this machine. Only readCounter (per-sample) is actually required.
+  gc_wig: "gc_hg19_1000kb.wig"
+  map_wig: "map_hg19_1000kb.wig"
+  centromere: "GRCh37.p13_centromere_UCSC-gapTable.txt"
+  # These CRAMs are chr-prefixed hg19, so ichorCNA must be told UCSC naming;
+  # its default (NCBI) would silently match zero chromosomes.
+  genome_style: "UCSC"
+  genome_build: "hg19"
+  # ichorCNA's own healthy-donor ultra-low-pass cfDNA panel of normals, hg19 at
+  # 1 Mb -- the matching bin size and build for this workflow, and the PoN the
+  # upstream ULP-WGS recipe uses. It ships in the 0.3.2 checkout's extdata (the
+  # conda 0.5.1 package carries only a 500 kb hg19 and a 1 Mb hg38 variant).
+  #
+  # This is emphatically NOT the TSO500 off-target PoN in
+  # /mnt/8tb_hdd/tso500offtarget_ichorcna, which phase2-preprocessing-plan.md
+  # §8b.2 rightly says not to reuse: that one is built from hybrid-capture
+  # panel off-target reads, not cfDNA WGS. HD_ULP is cfDNA WGS from healthy
+  # donors, which is exactly the background these samples are.
+  normal_panel: "/mnt/8tb_hdd/data/ichorCNA/inst/extdata/HD_ULP_PoN_1Mb_median_normAutosome_mapScoreFiltered_median.rds"
+
+  # ULP-WGS HMM parameters from ichorCNA's own scripts/README.md recipe, not
+  # runIchorCNA.R's bare defaults. sc_states in particular is mandatory: the
+  # script defaults it to "NULL" while leaving estimate_sc_prevalence TRUE,
+  # and that pair crashes runEM with "incorrect number of subscripts" partway
+  # through the fit (observed on IA01 before these were set).
+  ichor_ploidy: "c(2,3)"
+  ichor_normal: "c(0.5,0.6,0.7,0.8,0.9)"
+  ichor_sc_states: "c(1,3)"
+  ichor_max_cn: 5
+  ichor_txn_e: 0.9999
+  ichor_txn_strength: 10000
+
+  # Per-rule knobs. Decode threads matter more than job count -- see §8b.4.
+  samtools_threads: 4
+  mosdepth_threads: 4

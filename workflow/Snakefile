@@ -1,0 +1,65 @@
+"""Top-level Snakemake entry point. Deployment-specific resource directives
+(SLURM partition/account, job concurrency) live in workflow/profiles/*, not
+here, so this file runs unmodified locally or on the SLURM cluster.
+"""
+
+from pathlib import Path
+
+# Every path this workflow reads out of the checkout is built from REPO_ROOT
+# rather than written relative to the invocation directory, because the
+# drivers run Snakemake from a per-workflow directory under
+# snakemake_workdirs/ so that concurrent workflows get their own .snakemake
+# (see snakemake_workdirs/README.md). Snakemake resolves a relative
+# configfile/shell path against that working directory, not against this
+# file, so a bare "workflow/config/..." would look for it inside the
+# per-workflow dir and fail.
+REPO_ROOT = Path(workflow.basedir).parent
+CONFIG_DIR = REPO_ROOT / "workflow" / "config"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+
+configfile: str(CONFIG_DIR / "mat19.yaml")
+configfile: str(CONFIG_DIR / "mat20.yaml")
+configfile: str(CONFIG_DIR / "hcc1395.yaml")
+configfile: str(CONFIG_DIR / "hcc1395_merge.yaml")
+configfile: str(CONFIG_DIR / "local_features.yaml")
+configfile: str(CONFIG_DIR / "cohort_qc.yaml")
+configfile: str(CONFIG_DIR / "admixture_design.yaml")
+configfile: str(CONFIG_DIR / "admixture.yaml")
+
+
+include: "rules/common.smk"
+include: "rules/mat19.smk"
+include: "rules/mat20.smk"
+include: "rules/hcc1395.smk"
+include: "rules/local_features.smk"
+include: "rules/cohort_qc.smk"
+include: "rules/admixture_design.smk"
+include: "rules/admixture.smk"
+
+
+# Both rules can produce a merged HCC1395 library's mosdepth summary -- by
+# design: hcc1395_merged_coverage exists precisely so the number matches what
+# localfeat_coverage produces for the other 547 samples, which means matching
+# its output path too. hcc1395_merged_coverage wins because it reads the merged
+# CRAM straight off the HDD, while localfeat_coverage would first stage a
+# 40-70 GB copy onto an SSD that has ~184 GB free. Declared here rather than in
+# either rule file since it names rules from both, and neither is included
+# before the other in a fixed order relative to this line.
+ruleorder: hcc1395_merged_coverage > localfeat_coverage
+
+
+# rule all covers the cluster-side alignment targets only. local_features,
+# cohort_qc, admixture_design and admixture_mixtures run on the workstation
+# against a CRAM mirror and a derived tree that do not exist on the cluster,
+# so folding them in here would make `snakemake` on either machine try to
+# build targets whose inputs are on the other one. Ask for them by name:
+#   snakemake --workflow-profile workflow/profiles/local local_features_complete
+#   snakemake --workflow-profile workflow/profiles/local cohort_qc_complete
+#   snakemake --workflow-profile workflow/profiles/local admixture_design_complete
+#   snakemake --workflow-profile workflow/profiles/local admixture_mixtures_complete
+rule all:
+    input:
+        rules.mat19_alignment_complete.output,
+        rules.mat20_install_complete.output,
+        rules.hcc1395_alignment_complete.output,

@@ -1,0 +1,40 @@
+# Held-out evaluation + ichorCNA comparison (Phase 0 §5,
+# docs/todo/todo/held-out-evaluation-and-ichorcna-comparison.md): every tunable
+# `flash_fraq.tf_eval` needs, declared here rather than hardcoded, matching this
+# repo's established pattern (tf_model.yaml, admixture_design.yaml, ...).
+tf_eval:
+  # split_group values this evaluation is allowed to read -- never the training
+  # split. Must match tf_model.yaml's validation_split_group/test_split_group.
+  eval_split_groups:
+    - "validation"
+    - "test"
+
+  # Rows with empirical_tumor_fraction below this count as the "low tumor
+  # fraction" sensitivity slice, reported alongside the aggregate metrics.
+  low_fraction_threshold: 0.05
+
+  # A row is flagged in the disagreement table when |ichorCNA error| and
+  # |model error| (each vs. empirical_tumor_fraction) differ by more than this.
+  disagreement_threshold: 0.1
+
+  # Detection floor (phase0 §1.1/§5.1, comparable to ichorCNA's ~3% published
+  # floor): the null pool a mixture's predictions are tested against (one-sided
+  # Mann-Whitney U) is `nominal_tumor_fraction == 0` (audit finding 6), not this
+  # threshold -- `detection_floor_null_max` only applies to the fallback path
+  # (`compute_detection_floor` called with no explicit `null_mask`, e.g. direct
+  # unit tests), never to `TumorFractionModelEvaluator.evaluate_regime`.
+  detection_floor_null_max: 0.0
+  detection_floor_bin_edges:
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.05
+    - 0.08
+    - 0.12
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5
+  detection_floor_alpha: 0.05
+  detection_floor_min_null_n: 5
+  detection_floor_min_bin_n: 5

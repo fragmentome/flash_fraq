@@ -1,0 +1,44 @@
+[project]
+name = "flash_fraq"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "pysam",
+    "statsmodels",
+    "scikit-learn",
+    "pandas",
+    "requests",
+    "snakemake",
+    "snakemake-executor-plugin-slurm",
+    # Tumor-fraction regressor (phase0 §4, src/flash_fraq/tf_model.py): gradient
+    # boosting over xgboost because its PyPI wheel needs no NVIDIA CUDA/NCCL
+    # runtime dependency for CPU-only training (xgboost>=2 pulls one in, ~250 MB,
+    # unused here).
+    "lightgbm",
+    "joblib",
+    # Held-out evaluation (src/flash_fraq/tf_eval.py): correlation (pearsonr/
+    # spearmanr) and the detection-floor Mann-Whitney U test. Already an
+    # indirect dependency via statsmodels; declared directly since tf_eval
+    # imports it itself.
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+# scripts/make_figures.py
+figures = [
+    "matplotlib",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flash_fraq = ["data/*.tsv"]

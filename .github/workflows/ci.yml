@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install
+        run: pip install -e ".[dev,figures]"
+      - name: Lint
+        run: ruff check --select E9,F src scripts tests
+      - name: Unit tests
+        run: pytest -q tests
+      - name: Smoke test (synthetic data)
+        run: python scripts/smoke_test.py

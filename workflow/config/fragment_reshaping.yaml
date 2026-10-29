@@ -1,0 +1,39 @@
+# In silico fragment-size reshaping (docs/todo/completed/fragment-size-reshaping.md).
+# Reshapes HCC1395's mechanically-sheared insert-size distribution toward a
+# target ctDNA-like distribution, via insert-size-dependent read-pair
+# retention against the already-aligned CRAM -- no HCC1395 realignment.
+#
+# Not yet wired into workflow/Snakefile: this ticket produces
+# scripts/run_fragment_reshaping.py + flash_fraq.fragment_reshaping as a
+# standalone stage. Wiring its output in as an alternative
+# admixture_design.yaml `tumor.bam_path` for the real_background regime is a
+# later ticket (see the board).
+fragment_reshaping:
+  # HCC1395's deepest matched-pair library (admixture_design.yaml's tumor
+  # entry) -- the source distribution being reshaped.
+  source_bam: "/mnt/8tb_hdd/flash_fraq_crams/HCC1395_SEQC2/CRAM/HCC1395_WGS_NV_3/HCC1395_WGS_NV_3.sorted.cram"
+  reference_fasta: "/mnt/data/reference_genome/hg19/hg19.fa"
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/fragment_reshaping"
+
+  # The target ctDNA-like distribution: a real Cristiano/DELFI background
+  # library's own observed fragment sizes, per the ticket's "don't hardcode a
+  # shape" -- never a synthetic curve. Any single completed Cristiano CRAM
+  # works, ideally one at or above the admixture_design.yaml candidate
+  # `C_target` (>=1x) so its own insert-size histogram is well-resolved.
+  # Placeholder sample id below -- fill in a concrete <sample_id> from
+  # native_coverage.csv (docs/admixture-design.md) before this stage is run
+  # for real; kept a placeholder rather than a fabricated path.
+  target_bam: "/mnt/8tb_hdd/flash_fraq_crams/Cristiano_Velculescu_DELFI/CRAM/<CRISTIANO_SAMPLE_ID>/<CRISTIANO_SAMPLE_ID>.sorted.cram"
+
+  # ichorCNA-style ULP-WGS and cfDNA fragments both live well inside this
+  # range; outside it is either a mapping artefact or a tail not worth
+  # histogram resolution over.
+  min_insert_size: 30
+  max_insert_size: 700
+
+  # ks_statistic_from_histograms' max-CDF-gap output, in [0, 1]. 0.15 is
+  # deliberately loose so a first real run fails on genuine mismatch, not on
+  # sampling noise; tighten once a real run's baseline statistic is known.
+  ks_threshold: 0.15
+
+  seed: 42

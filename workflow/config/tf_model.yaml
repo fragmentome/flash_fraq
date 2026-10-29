@@ -1,0 +1,35 @@
+# Tumor-fraction regressor (Phase 0 §4, docs/todo/todo/tumor-fraction-regressor.md):
+# LightGBM hyperparameters, split-group names and the derived-data output root for
+# the trained model artifacts. Declared here, not hardcoded, matching this repo's
+# established pattern (admixture_design.yaml's C_target, fraction ladder, ...).
+#
+# `include_ichorcna_feature: false` is the headline/primary model (phase0 §2:
+# ichorCNA's point estimate must not dominate the reported model). The ablation
+# variant that includes it is opted into explicitly per run, not switched on here.
+tf_model:
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/models/tf_model"
+
+  train_split_group: "train"
+  validation_split_group: "validation"
+  test_split_group: "test"
+
+  include_ichorcna_feature: false
+
+  # audit finding 2: "all" (default) trains on every §9 feature; "cnv_only"
+  # restricts to cnv_logr_bin_*, arm_zscore_* and gc_corrected_total_coverage_window_*
+  # -- the fallback when fragmentomics features are not interpretable in this
+  # cohort (audit finding 1, tumor-side sheared gDNA vs cfDNA library-prep confound);
+  # "fragment_only" restricts to short_long_ratio_window_* and fragment_size_*
+  # -- cnv_only's complement, testing the DELFI fragment-ratio-alone question
+  # (docs/motivation-and-goal.md §1).
+  feature_set: "all"
+
+  hyperparameters:
+    n_estimators: 300
+    num_leaves: 31
+    max_depth: -1
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_samples: 10
+    random_state: 42

@@ -1,0 +1,11 @@
+# Overlay for the reshaped-tumor rebuild -- see admixture_design_reshaped.yaml
+# for the layering mechanics. Only `output_root` differs from
+# workflow/config/admixture.yaml: new mixtures must never land under (or be
+# confused with) the original admixture_mixtures/ tree, since that tree is
+# live output from the already-completed 495-mixture build and this run's
+# 40-donor rung reassignment does not correspond 1:1 with it (a `mix_*` name
+# can be reused for a different donor/seed -- see
+# docs/todo/todo/reshaped-mixture-downstream-rerun.md, "40 new rows reuse an
+# old mix_* name with a new seed").
+admixture:
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped"

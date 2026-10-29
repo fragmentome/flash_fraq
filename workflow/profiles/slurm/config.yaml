@@ -1,0 +1,39 @@
+# Requires the `snakemake-executor-plugin-slurm` package on the cluster.
+executor: slurm
+jobs: 30
+# Transient SLURM launch failures (batch step cancelled at t=0, no log
+# written) otherwise abort the whole workflow on a healthy node.
+retries: 2
+# Without keep-going the first failed sample aborts the DAG, so a run only
+# ever reveals one broken sample per submission.
+keep-going: true
+# isilon is NFS-backed; output files can lag behind job completion.
+latency-wait: 60
+default-resources:
+  slurm_account: "users"
+  slurm_partition: "cpu"
+# Global cap on concurrent ENA downloads (install_align_snyder requests
+# ena_download=1 each) -- independent of the SLURM executor, so it's set
+# here rather than left implicit in `jobs`.
+#
+# sra_fetch caps concurrent fetch_hcc1395_fastq jobs. This is a disk limit,
+# not a bandwidth one: each job holds its .sra (up to 175G) plus both
+# uncompressed mates before gzip -- a 26G .sra expanded to a 73.7G _2.fastq,
+# so ~350G of peak footprint per run. At `jobs: 30` the 118-run cohort would
+# need ~10T against a fileset with ~4.5T free, which is what exhausted
+# storage in job 2731670. 4.5T / 350G caps concurrency at 12 -- set here
+# rather than higher, since 13 would exceed the free space by itself. The
+# ENA-submitted-fastq path (docs/todo/in-progress/hcc1395-retrieval-throughput.md)
+# would have let some fraction of runs skip the .sra footprint entirely, but
+# ENA serves 0 of SRP162370's 118 WGS/Illumina runs as submitted fastq.gz
+# (checked 2026-09-01), so every fetch takes the full-footprint SRA-toolkit
+# path and 12 is the real ceiling, not a conservative one.
+#
+# bam_align caps concurrent align_hcc1395 jobs, for the same reason: each
+# holds a ~200G sorted BAM until cram_hcc1395 converts it and deletes it,
+# so `jobs: 30` would put ~6T of BAM on the fileset on top of whatever the
+# fetches are holding.
+resources:
+  ena_download: 4
+  sra_fetch: 12
+  bam_align: 16

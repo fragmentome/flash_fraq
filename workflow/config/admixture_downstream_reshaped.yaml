@@ -1,0 +1,75 @@
+# Overlay/standalone config for the reshaped-mixture downstream rerun
+# (docs/todo/todo/reshaped-mixture-downstream-rerun.md).
+#
+# Only the "assemble/gate/train/evaluate" stages that operate on the whole
+# matrix are modeled as Snakemake rules here (see
+# workflow/rules/admixture_downstream.smk): feature-matrix assembly, decoy QC
+# (per regime), tf_model (per feature_set) and tf_eval (per feature_set). The
+# four per-mixture stages (relabel, fragment extraction, GC correction,
+# ichorCNA) reuse the existing, already-tested
+# scripts/drivers/admixture_mixture_{relabel,fragments,gc_correct,ichor}_driver.sh
+# bash drivers directly (parameterized by MIXTURES_ROOT), not Snakemake rules
+# -- those drivers already implement the SSD-staging/concurrency tuning this
+# layout needs (see each driver's own docstring), and reimplementing that in
+# Snakemake would duplicate tested logic for no benefit. This file is loaded
+# by workflow/Snakefile_reshaped_downstream (a separate, small entry point
+# from the main workflow/Snakefile) via scripts/drivers/reshaped_downstream_chain.sh,
+# never by the main Snakefile -- so it never touches the live
+# snakemake_workdirs/admixture build.
+
+# The flash_fraq conda env's interpreter, invoked by full path from every
+# downstream_* rule's shell: command (see admixture_downstream.smk's own
+# comment) because the "snakemake" conda env scripts/drivers/reshaped_downstream_chain.sh
+# activates to run snakemake itself does not have pandas/lightgbm/scikit-learn
+# installed.
+flashfraq_python: "/home/matvii/miniconda3/envs/flash_fraq/bin/python"
+
+admixture_downstream:
+  mixtures_root: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped"
+  # Written by reshaped_downstream_chain.sh before Snakemake ever runs: the
+  # reshaped admixture_plan.csv (real_background only, matched_pair_replicates_per_fraction:
+  # 0 in admixture_design_reshaped.yaml) plus the 11 matched_pair rows carried
+  # over unchanged from the *original* build's plan, concatenated -- see that
+  # script's "combined plan" stage. run_admixture_mixture_feature_matrix.py's
+  # regime join aborts on any unmatched sample_id, and the reshaped plan alone
+  # has no matched_pair rows at all (they are symlinked mixtures, never part
+  # of this plan).
+  combined_plan_path: "/mnt/8tb_hdd/flash_fraq_derived/cohort_reshaped/admixture_plan_combined.csv"
+  split_assignment_path: "/mnt/8tb_hdd/flash_fraq_derived/cohort_reshaped/split_assignment.csv"
+  agg_dir: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/agg"
+  feature_matrix_path: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/feature_matrix.csv"
+  feature_matrix_summary_path: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/feature_matrix_summary.json"
+  feature_matrix_real_background_path: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/feature_matrix_real_background.csv"
+  # Centromere/chromosome-end mask (flash_fraq.genome_mask), same value
+  # local_features.yaml/the gc-correct driver already use.
+  mask_margin_bp: 5000000
+
+  decoy_qc_dir: "/mnt/8tb_hdd/flash_fraq_derived/admixture_mixtures_reshaped/decoy_qc"
+  decoy_qc_regimes: ["real_background", "matched_pair"]
+  # Which regime(s)' decoy_qc_report_<regime>.json 'passed' field the chain
+  # driver hard-gates tf_model/tf_eval on (src/flash_fraq/decoy_qc.py's own
+  # pass/fail semantics, report_path()'s regime suffix). matched_pair is
+  # reported but not gated on by default: it was never reshaped (reshaping
+  # does not apply to a sheared-cell-line-vs-sheared-cell-line pair, see
+  # admixture_design_reshaped.yaml), so its check 3 is expected to keep
+  # flagging for a reason unrelated to this rerun's fix, and it only ever
+  # gets a descriptive (non-held-out) tf_eval report, never a trained model.
+  decoy_qc_gate_regimes: ["real_background"]
+
+  models_root: "/mnt/8tb_hdd/flash_fraq_derived/models/tf_model_reshaped"
+  feature_sets: ["all", "cnv_only", "fragment_only"]
+
+  # tf_model.yaml/tf_eval.yaml hyperparameters, restated here only where this
+  # run's CLI call needs to pass them explicitly (train_tf_model.py/run_tf_eval.py's
+  # own defaults already equal every value in those two files, so most are
+  # never actually overridden below -- see workflow/config/tf_model.yaml,
+  # workflow/config/tf_eval.yaml).
+  tf_model_hyperparameters:
+    n_estimators: 300
+    num_leaves: 31
+    max_depth: -1
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_samples: 10
+    random_state: 42

@@ -1,0 +1,48 @@
+# Pre-admixture cohort feature matrix + phase2 §6 decoy-classifier gate.
+#
+# Workstation-local, like local_features: it reads that workflow's derived
+# outputs, which only exist on the HDD mirror.
+cohort_qc:
+  # Same tree local_features writes to (local_features.output_root). Kept as its
+  # own key rather than read from that block so the QC can be pointed at a
+  # re-exported or subsetted derived tree without editing the extraction config.
+  derived_root: "/mnt/8tb_hdd/flash_fraq_derived"
+  output_root: "/mnt/8tb_hdd/flash_fraq_derived/cohort"
+
+  # dataset directory -> sequencing platform. The platform is what the §6 decoy
+  # classifier is trained to predict, and it is *not* recoverable from the
+  # derived tables, so it is declared here.
+  #
+  # Snyder GSE71378 is HiSeq2000 (the value install_snyder_data.py stamps into
+  # its read groups); the Cristiano DELFI cohort is HiSeq2500 per
+  # docs/phase1-sourcing.md. Both are single-platform cohorts, so one label per
+  # dataset is exact rather than a summary.
+  dataset_platforms:
+    Snyder_Shendure_WPS: "HiSeq2000"
+    Cristiano_Velculescu_DELFI: "HiSeq2500"
+
+  reference_build: "hg19"
+
+  # phase2 §6 check 2's red-flag threshold on |corr(predicted-source-probability,
+  # tumor fraction)|.
+  correlation_threshold: 0.1
+  # Check 1 runs at f=0 -- "especially f=0, pure healthy" (§6). With ichorCNA
+  # standing in for the label, f=0 means "ichorCNA called no CNV signal", which
+  # is most of this cohort.
+  fixed_fraction_target: 0.0
+  fixed_fraction_tolerance: 0.05
+  # 0.0 = use only feature columns present for every sample. The per-sample
+  # window/arm/bin sets are ragged, so this is a real restriction; see
+  # decoy_qc.DecoyClassifierQcConfig.max_missing_fraction.
+  max_missing_fraction: 0.0
+  # Check 2 scores every sample out-of-fold (StratifiedKFold, shuffled, seeded by the
+  # module's random_state) rather than in-sample. 5 folds needs the smallest source to
+  # have at least 5 samples; Snyder has 44. Below that the check is skipped with a
+  # reason rather than run on a quietly different fold count.
+  n_splits: 5
+
+  # The gate is informational at this stage: it runs against ichorCNA's estimate
+  # rather than a real empirical tumor fraction, so a flag is a signal to
+  # investigate, not a reason to fail the workflow. Flip to true once the §9
+  # admixture matrix exists and the gate runs on empirical_tumor_fraction.
+  fail_on_flag: false

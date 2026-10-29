@@ -1,0 +1,18 @@
+{
+  "title": "flash_fraq: fragmentomics-first ctDNA tumor fraction estimation from low-pass cfDNA",
+  "description": "A Snakemake pipeline and gradient-boosting regressor that predicts continuous ctDNA tumor fraction from low-pass cell-free DNA copy-number and fragment-size features, trained on in silico admixtures of HCC1395 tumor reads into cfDNA backgrounds and benchmarked against ichorCNA. Research use only; not clinically validated.",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Mykhailichenko, Matvii"
+    }
+  ],
+  "keywords": [
+    "ctDNA",
+    "cell-free DNA",
+    "fragmentomics",
+    "liquid biopsy",
+    "tumor fraction"
+  ]
+}
