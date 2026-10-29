@@ -7,7 +7,7 @@ authors:
     given-names: Matvii
 version: 0.1.0
 # TODO(author): replace after the first Zenodo release is issued
-doi: 10.5281/zenodo.XXXXXXX
+doi: 10.5281/zenodo.23768562
 date-released: "2026-10-29"
 license: MIT
 repository-code: "https://github.com/fragmentome/flash_fraq"

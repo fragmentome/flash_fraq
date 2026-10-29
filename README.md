@@ -5,7 +5,7 @@ Estimate ctDNA **tumor fraction** from low-pass cfDNA with a gradient-boosting r
 [![CI](https://github.com/fragmentome/flash_fraq/actions/workflows/ci.yml/badge.svg)](https://github.com/fragmentome/flash_fraq/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](pyproject.toml)
-[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.XXXXXXX-lightgrey.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23768562-lightgrey.svg)](https://doi.org/10.5281/zenodo.23768562)
 
 > **Research use only. Not clinically validated.** The reported results are on *in silico* mixtures of a
 > single cell line into donor cfDNA, not on patient plasma with a known tumor fraction.
@@ -154,14 +154,14 @@ Start at [docs/README.md](docs/README.md) for the design and write-up index.
 
 ## Citation
 
-See [`CITATION.cff`](CITATION.cff). The DOI is issued on first release.
+See [`CITATION.cff`](CITATION.cff). Archived on Zenodo.
 
 ```bibtex
 @software{mykhailichenko_flash_fraq,
   author  = {Mykhailichenko, Matvii},
   title   = {flash\_fraq: fragmentomics-first ctDNA tumor fraction estimation from low-pass cfDNA},
   version = {0.1.0},
-  doi     = {10.5281/zenodo.XXXXXXX},
+  doi     = {10.5281/zenodo.23768562},
   url     = {https://github.com/fragmentome/flash_fraq}
 }
 ```
